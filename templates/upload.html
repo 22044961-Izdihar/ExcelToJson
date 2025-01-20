@@ -30,6 +30,7 @@
             border-radius: 8px;
             text-align: center;
             cursor: pointer; /* Change cursor to pointer */
+            border: 2px dashed #007bff; /* Add a dashed border */
         }
         .upload-area i {
             font-size: 40px;
@@ -97,11 +98,37 @@
 
             // Show success message when a file is selected
             if (fileInput.files.length > 0) {
-                successMessage.textContent = 'File attached';
+                const fileName = fileInput.files[0].name; // Get the name of the uploaded file
+                successMessage.textContent = `File attached: ${fileName}`; // Display the file name
             } else {
                 noFileMessage.textContent = 'No File attached';
                 noFileMessage.className = 'no-file'; // Set class for no file message
             }
+        }
+
+        function handleDrop(event) {
+            event.preventDefault();
+            const fileInput = document.getElementById('file-input');
+            const successMessage = document.getElementById('success-message');
+            const noFileMessage = document.getElementById('no-file-message');
+
+            // Clear previous messages
+            successMessage.textContent = '';
+            noFileMessage.textContent = '';
+
+            const files = event.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput.files = files; // Assign the dropped files to the input
+                const fileName = files[0].name; // Get the name of the dropped file
+                successMessage.textContent = `File attached: ${fileName}`; // Display the file name
+            } else {
+                noFileMessage.textContent = 'No File attached';
+                noFileMessage.className = 'no-file'; // Set class for no file message
+            }
+        }
+
+        function handleDragOver(event) {
+            event.preventDefault(); // Prevent default behavior (Prevent file from being opened)
         }
     </script>
 </head>
@@ -112,7 +139,7 @@
         </div>
         <h1>SJR Converter</h1>
         <form action="/upload" method="post" enctype="multipart/form-data" onsubmit="validateForm(event);">
-            <div class="upload-area" onclick="document.getElementById('file-input').click();">
+            <div class="upload-area" onclick="document.getElementById('file-input').click();" ondrop="handleDrop(event);" ondragover="handleDragOver(event);">
                 <i class="fas fa-upload"></i>
                 <p>Drag and drop your Excel file here</p>
                 <p>OR</p>
