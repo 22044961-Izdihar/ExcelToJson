@@ -4,13 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SJR Excel to JSON converter</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <style>
         body {
             font-family: sans-serif;
             background-color: #e0f2ff;
+            margin: 0; /* Remove default margin */
+            padding-bottom: 50px; /* Add padding to prevent content from being hidden behind the footer */
         }
         .container {
-            width: 500px;
+            max-width: 500px; /* Set a maximum width */
+            width: 90%; /* Use percentage for responsiveness */
             margin: 50px auto;
             background-color: #fff;
             padding: 30px;
@@ -68,6 +72,16 @@
             color: red; /* New class for "No File attached" message */
             text-align: center;
             margin-top: 10px;
+        }
+        .footer {
+            background-color: black;
+            color: white;
+            text-align: center;
+            padding: 10px;
+            position: fixed; /* Fix the footer to the bottom */
+            bottom: 0; /* Align to the bottom */
+            left: 0; /* Align to the left */
+            width: 100%; /* Full width */
         }
     </style>
     <script>
@@ -151,6 +165,9 @@
             <div id="no-file-message" class="no-file"></div> <!-- New no file message div -->
             <button type="submit">Convert</button>
         </form>
+    </div>
+    <div class="footer">
+        ⓘ This website was created by interns to help out in SJR Testing.
     </div>
 </body>
 </html>
