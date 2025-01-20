@@ -1,7 +1,7 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_file
 import pandas as pd
 import json
-import os
+import io
 
 app = Flask(__name__)
 
@@ -193,12 +193,17 @@ def upload():
 
             json_data.append(row_json)
 
-        # Save the JSON data to a file
-        json_file_path = "output_data.json"
-        with open(json_file_path, "w") as json_file:
-            json.dump(json_data, json_file, indent=4)
+        # Create an in-memory file and save the JSON data
+        json_file = io.BytesIO()
+        json_file.write(json.dumps(json_data, indent=4).encode('utf-8'))
+        json_file.seek(0)
 
-        return jsonify({"message": "File uploaded and processed successfully."}), 200
+        return send_file(
+            json_file,
+            as_attachment=True,
+            download_name='output_data.json',
+            mimetype='application/json'
+        )
 
     return jsonify({"error": "Invalid file format"}), 400
 
