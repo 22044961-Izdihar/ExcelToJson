@@ -17,11 +17,12 @@ def upload():
     if file.filename == '':
         return jsonify({"error": "No selected file"}), 400
     if file and (file.filename.endswith('.xlsx') or file.filename.endswith('.xls')):
+
         # Load the Excel file and strip extra spaces
         df = pd.read_excel(file)
         df.columns = df.columns.str.strip()
 
-        # 1. Filter out columns with date values and change format to yyyymmdd
+        # Filter out columns with date values and change format to yyyymmdd
         columns_with_date = [
             'Enrolment Date', 'Year of birth of Applicant', 'Year of birth of the child',
             'FM Start Date of enrolment', 'CCFA Start Date', 'CCFA End Date'
@@ -32,7 +33,7 @@ def upload():
         for col in datecolumns_df:
             df[col] = pd.to_datetime(df[col], format='%d/%m/%Y', errors='coerce').dt.strftime('%Y%m%d')
 
-        # 2. Update working status
+        # Update working status
         def map_working_status(status):
             if status == "Salaried Employee":
                 return "WEP"
@@ -48,9 +49,47 @@ def upload():
         # Replace missing values with blanks
         df = df.fillna("")
 
+        # Update the citizenship mapping
+        def map_citizenship(citizenship):
+            if citizenship == "Singaporean":
+                return "SC"
+            elif citizenship == "Foreigner":
+                return "Others"
+            elif citizenship == "Permanent Resident":
+                return "PR"
+            else:
+                return citizenship  
+            
+        # Function to clean marital status
+        def clean_marital_status(status):
+            m_status = status.split('\n')[-1].strip() if '\n' in status else status.strip()
+            if m_status == "Married":
+                return "M"
+            elif m_status == "Single":
+                return "S"
+            else:
+                return m_status
+
         # Build the JSON data
         json_data = []
         for num, (_, row) in enumerate(df.iterrows(), start=1):
+        # Determine the income values based on WorkingStatus
+            working_status = row.get("Main Applicant working status", "")
+            if working_status == "WSP":
+                wep_income = ""
+                wsp_income = row.get("Main Applicant Gross Monthly Income 1", "")
+            elif working_status == "WEP":
+                wep_income = row.get("Main Applicant Gross Monthly Income 1", "")
+                wsp_income = ""
+            elif working_status == "WEPWSP":
+                wep_income = row.get("Main Applicant Gross Monthly Income 1", "")
+                wsp_income = row.get("Main Applicant Gross Monthly Income 1", "")
+            else:
+                wep_income = ""
+                wsp_income = ""
+            
+
+
             row_json = {
                 f"Row {num} TC00{num}  ChildInfo": {
                     "Gender": row.get("Gender", ""),
@@ -60,7 +99,8 @@ def upload():
                     "Name": row.get("Child Name", ""),
                     "Race": row.get("Child Race", ""),
                     "RelationshipToChild": "Child",
-                    "TypeOfCitizenship": row.get("Child Citizenship", ""),
+                    "TypeOfCitizenship": map_citizenship(row.get("Child Citizenship", "")),
+                    
                 },
                 "EnrolmentApplicantInfo": {
                     "RelationshipToChild": row.get("Main Applicant Relationship to Child", ""),
@@ -68,10 +108,10 @@ def upload():
                     "Name": row.get("Main Applicant Name", ""),
                     "Gender": row.get("Main Applicant Gender", ""),
                     "DateOfBirth": row.get("Year of birth of Applicant", ""),
-                    "TypeOfCitizenship": row.get("Main Applicant Type of Citizenship", ""),
+                    "TypeOfCitizenship": map_citizenship(row.get("Main Applicant Type of Citizenship", "")),
                     "IdentityNumber": row.get("Applicant ID", ""),
                     "IdentityType": row.get("Main Applicant ID Type", ""),
-                    "MaritalStatus": row.get("Main Applicant", ""),
+                    "MaritalStatus": clean_marital_status(row.get("Main Applicant", "")),
                     "IsJointCustody": row.get("Is Joint Custody", ""),
                     "PostalCode": row.get("Postal Code", ""),
                     "BlockNumber": row.get("Block Number", ""),
@@ -79,16 +119,16 @@ def upload():
                     "BuildingName": row.get("Building Name", ""),
                     "FloorNo": row.get("Floor No", ""),
                     "UnitNo": row.get("Unit No", ""),
-                    "WorkingStatus": [{"Value": row.get("Main Applicant working status", "")}],
+                    "WorkingStatus": [{"Value": working_status}],
                     "NWReason": row.get("Main Applicant Not working reason", ""),
                     "ApplicantWSG": row.get("Applicant WSG", ""),
                     "EDD": row.get("EDD", ""),
                     "EmploymentWithInPast2Months": row.get("Within last 2 months", ""),
                     "DateOfEmployment": row.get("Main Applicant Emp start Date", ""),
                     "ReceivingCPF": row.get("Main Applicant - Receiving CPF ?", ""),
-                    "MainApplicantWEPGrossMonthlyIncome": row.get("Main Applicant Gross Monthly Income 1", ""),
+                    "MainApplicantWEPGrossMonthlyIncome": wep_income,
                     "HasLatestNOA": row.get("Main Applicant has NOA ?", ""),
-                    "MainApplicantWSPGrossMonthlyIncome": row.get("Main Applicant Gross Monthly Income 2", ""),
+                    "MainApplicantWSPGrossMonthlyIncome": wsp_income,
                     "MobileNoSG": row.get("Mobile No", ""),
                     "TelephoneNo": row.get("Telephone No", ""),
                     "EmailAddress": row.get("Email Address", ""),
@@ -100,6 +140,7 @@ def upload():
                     }
                 },
                 "EnrolmentInfo": {
+                    "EnrolmentID": row.get("Enrol ID", ""),
                     "DateOfEnrolment": row.get("Enrolment Date", ""),
                     "EnlmMthProgFeeWOGST": row.get("Enlm Mth Prog Fee WOGST", ""),
                     "EnlmMthProration": row.get("Enlm Mth Proration", ""),
@@ -130,21 +171,63 @@ def upload():
                 },
                 "FamilyMemberList": [
                     {
-                        "Name": row.get("Family Member Name 1", ""),
-                        "RelationshipToChild": row.get("Family Member Relationship 1", ""),
-                        "IdentityNumber": row.get("Family Member ID 1", ""),
-                        "DateOfBirth": row.get("Family Member DOB 1", ""),
-                        "WorkingStatus": row.get("Family Member Working Status 1", ""),
-                        "GrossMonthlyIncome": row.get("Family Member Gross Monthly Income 1", ""),
-                        "EmploymentWithInPast2Months": row.get("Family Member Employment Within Past 2 Months 1", ""),
-                        "DateOfEmployment": row.get("Family Member Employment Date 1", ""),
+                        "Name": row.get("Family Member Name", ""),
+                        "RelationshipToChild": row.get("Family Member Relationship", ""),
+                        "IdentityNumber": row.get("Family Member ID", ""),
+                        "DateOfBirth": row.get("Family Member DOB", ""),
+                        "WorkingStatus": row.get("Family Member Working Status", ""),
+                        "GrossMonthlyIncome": row.get("Family Member Gross Monthly Income", ""),
+                        "EmploymentWithInPast2Months": row.get("Family Member Employment Within Past 2 Months", ""),
+                        "DateOfEmployment": row.get("Family Member Employment Date", ""),
                         "Consent": {
                             "IsNoValidAuthority": "N",
                             "ConsentScope": "AS",
                             "ConsentType": "NCO",
                             "ConsentSigningDate": "20240930",
                         }
-                    }
+                    },
+                    {
+                        "Name": row.get("Family Member Name", ""),
+                        "RelationshipToChild": row.get("Family Member Relationship", ""),
+                        "IdentityNumber": row.get("Family Member ID", ""),
+                        "DateOfBirth": row.get("Family Member DOB", ""),
+                        "WorkingStatus": row.get("Family Member Working Status", ""),
+                        "GrossMonthlyIncome": row.get("Family Member Gross Monthly Income", ""),
+                        "EmploymentWithInPast2Months": row.get("Family Member Employment Within Past 2 Months", ""),
+                        "DateOfEmployment": row.get("Family Member Employment Date", ""),
+                        "Consent": {
+                            "IsNoValidAuthority": "N",
+                            "ConsentScope": "AS",
+                            "ConsentType": "NCO",
+                            "ConsentSigningDate": "20240930",
+                        }
+                    },
+                    {
+                        "Name": row.get("Family Member Name", ""),
+                        "RelationshipToChild": row.get("Family Member Relationship", ""),
+                        "IdentityNumber": row.get("Family Member ID", ""),
+                        "DateOfBirth": row.get("Family Member DOB", ""),
+                        "WorkingStatus": row.get("Family Member Working Status", ""),
+                        "GrossMonthlyIncome": row.get("Family Member Gross Monthly Income", ""),
+                        "EmploymentWithInPast2Months": row.get("Family Member Employment Within Past 2 Months", ""),
+                        "DateOfEmployment": row.get("Family Member Employment Date", ""),
+                        "Consent": {
+                            "IsNoValidAuthority": "N",
+                            "ConsentScope": "AS",
+                            "ConsentType": "NCO",
+                            "ConsentSigningDate": "20240930",
+                            "ConsentProviders":[
+                                {
+                                    "IdentityNumber": "",
+                                    "IdentityType": "",
+                                    "Name": "",
+                                    "LegalCapacity": "",
+                                     "ConsentSigningDate": ""
+                                }
+                            ]
+                        }
+                    },
+                    
                 ],
                 "SpouseInfo": {
                     "RelationshipToChild": row.get("Spouse Relationship to Child", ""),
@@ -152,7 +235,7 @@ def upload():
                     "Name": row.get("Spouse Name", ""),
                     "DateOfBirth": row.get("Spouse DOB", ""),
                     "Gender": row.get("Spouse Gender", ""),
-                    "TypeOfCitizenship": row.get("Spouse Type of Citizenship", ""),
+                    "TypeOfCitizenship": map_citizenship(row.get("Spouse Type of Citizenship", "")),
                     "IdentityNumber": row.get("Spouse ID", ""),
                     "IdentityType": row.get("Spouse ID Type", ""),
                     "IsIncarcerated": row.get("Spouse Is Incarcerated", ""),
